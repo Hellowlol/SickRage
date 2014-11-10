@@ -37,6 +37,7 @@ from sickbeard import processTV
 from sickbeard import network_timezones, sbdatetime
 from sickbeard.exceptions import ex
 from sickbeard.common import SNATCHED, SNATCHED_PROPER, DOWNLOADED, SKIPPED, UNAIRED, IGNORED, ARCHIVED, WANTED, UNKNOWN
+from trakt import TraktCall
 from common import Quality, qualityPresetStrings, statusStrings
 
 try:
@@ -64,6 +65,7 @@ result_type_map = {RESULT_SUCCESS: "success",
                    RESULT_DENIED: "denied",
 }
 # basically everything except RESULT_SUCCESS / success is bad
+
 
 class Api(webserve.MainHandler):
     """ api class that returns json results """
@@ -1083,6 +1085,65 @@ class CMD_SubtitleSearch(ApiCall):
         ui.notifications.message('Subtitles Search', status)
 
         return response
+
+
+class CMD_TraktRecommended(ApiCall):
+    _help = {"desc": "Return Get a list of show recommendations created from your watching history and your friends"}
+
+    def __init__(self, handler, args, kwargs):
+        # required
+        # optional
+        # super, missing, help
+        ApiCall.__init__(self, handler, args, kwargs)
+
+    def run(self):
+        """ Show recommended shows on Trakt """
+        result_list = []
+
+        if not sickbeard.TRAKT_USERNAME or not sickbeard.TRAKT_API or not sickbeard.TRAKT_PASSWORD:
+            return _responds(RESULT_FAILURE, msg="You need set Trakt apikey, password and username")
+
+        recommendedlist = TraktCall("recommendations/shows.json/%API%", sickbeard.TRAKT_API, sickbeard.TRAKT_USERNAME,
+                                    sickbeard.TRAKT_PASSWORD)
+
+        if recommendedlist == 'NULL':
+            return _responds(RESULT_FAILURE, data=result_list, msg="No shows found in your recommendedlist")
+
+        if recommendedlist is None:
+            return _responds(RESULT_FAILURE, data=result_list, msg="Could not connect to trakt service, aborting recommended list update")
+
+        result_list = [show for show in recommendedlist if not helpers.findCertainShow(sickbeard.showList, indexerid=int(show['tvdb_id']))]
+
+        return _responds(RESULT_SUCCESS, data=result_list)
+
+
+class CMD_TraktTrending(ApiCall):
+    _help = {"desc": "Returns all shows being watched right now on Trakt"}
+
+    def __init__(self, handler, args, kwargs):
+        # required
+        # optional
+        # super, missing, help
+        ApiCall.__init__(self, handler, args, kwargs)
+
+    def run(self):
+        """ Show Trending shows on Trakt """
+        result_list = []
+
+        if not sickbeard.TRAKT_API:
+            return _responds(RESULT_FAILURE, msg="You need set Trakt apikey")
+
+        trendinglist = TraktCall("shows/trending.json/%API%", sickbeard.TRAKT_API_KEY)
+
+        if trendinglist == 'NULL':
+            return _responds(RESULT_FAILURE, data=result_list, msg="No shows found in your trendinglist")
+
+        if trendinglist is None:
+            return _responds(RESULT_FAILURE, data=result_list, msg="Could not connect to trakt service, aborting trending list update")
+
+        result_list = [show for show in trendinglist if not helpers.findCertainShow(sickbeard.showList, indexerid=int(show['tvdb_id']))]
+
+        return _responds(RESULT_SUCCESS, data=result_list)
 
 
 class CMD_Exceptions(ApiCall):
@@ -2680,5 +2741,7 @@ _functionMaper = {"help": CMD_Help,
                   "show.stats": CMD_ShowStats,
                   "show.update": CMD_ShowUpdate,
                   "shows": CMD_Shows,
-                  "shows.stats": CMD_ShowsStats
+                  "shows.stats": CMD_ShowsStats,
+                  "trakt.trending": CMD_TraktTrending,
+                  "trakt.recommended": CMD_TraktRecommended
 }
