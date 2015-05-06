@@ -1370,7 +1370,8 @@ class CMD_PostProcess(ApiCall):
                                     "return_data": {"desc": "Returns result for the process"},
                                     "process_method": {"desc": "Symlink, hardlink, move or copy the file"},
                                     "is_priority": {"desc": "Replace the file even if it exists in a higher quality)"},
-                                    "type": {"desc": "What type of postprocess request is this, auto of manual"}
+                                    "type": {"desc": "What type of postprocess request is this, auto of manual",
+                                    "failed": {"desc": "Handle failed downloads?"}
              }
     }
 
@@ -1382,6 +1383,7 @@ class CMD_PostProcess(ApiCall):
         self.return_data, args = self.check_params(args, kwargs, "return_data", 0, False, "bool", [])
         self.process_method, args = self.check_params(args, kwargs, "process_method", False, False,
                                                       "string", ["copy", "symlink", "hardlink", "move"])
+        self.failed, args = self.check_params(args, kwargs, "failed", 0, False, "bool", [])
         self.is_priority, args = self.check_params(args, kwargs, "is_priority", 0, False, "bool", [])
         self.type, args = self.check_params(args, kwargs, "type", "auto", None, "string",
                                             ["auto", "manual"])
@@ -1395,12 +1397,15 @@ class CMD_PostProcess(ApiCall):
 
         if not self.path:
             self.path = sickbeard.TV_DOWNLOAD_DIR
+            
+        if not self.failed:
+            self.failed = False
 
         if not self.type:
             self.type = 'manual'
 
         data = processTV.processDir(self.path, process_method=self.process_method, force=self.force_replace,
-                                    is_priority=self.is_priority, failed=False, type=self.type)
+                                    is_priority=self.is_priority, failed=self.failed, type=self.type)
 
         if not self.return_data:
             data = ""
